@@ -3,47 +3,36 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"log"
 	"os"
 	"strconv"
 	"strings"
 )
 
-type Graph struct {
-	nodes map[string]*Node
+type Node struct {
+	Name      string
+	Neighbors []*Node
 }
 
-type Node struct {
-	name      string
-	neighbors []*Node
+type Graph struct {
+	Nodes map[string]*Node
 }
 
 func NewGraph() *Graph {
 	return &Graph{
-		nodes: make(map[string]*Node),
+		Nodes: make(map[string]*Node),
 	}
 }
 
-func (g *Graph) AddNode(name string) {
-	if _, ok := g.nodes[name]; !ok {
-		g.nodes[name] = &Node{
-			name: name,
-		}
-	}
+func (g *Graph) AddRoom(name string) {
+	node := &Node{Name: name}
+	g.Nodes[name] = node
 }
 
-func (g *Graph) AddEdge(src, dst string) {
-	srcNode, ok := g.nodes[src]
-	if !ok {
-		log.Fatalf("Node '%s' not found in the graph", src)
-	}
-	dstNode, ok := g.nodes[dst]
-	if !ok {
-		log.Fatalf("Node '%s' not found in the graph", dst)
-	}
+func (g *Graph) AddArc(from, to string) {
+	fromNode := g.Nodes[from]
+	toNode := g.Nodes[to]
 
-	srcNode.neighbors = append(srcNode.neighbors, dstNode)
-	dstNode.neighbors = append(dstNode.neighbors, srcNode)
+	fromNode.Neighbors = append(fromNode.Neighbors, toNode)
 }
 
 func ParseInputFile(filename string) (*Graph, error) {
@@ -53,55 +42,43 @@ func ParseInputFile(filename string) (*Graph, error) {
 	}
 	defer file.Close()
 
+	scanner := bufio.NewScanner(file)
 	graph := NewGraph()
 
-	scanner := bufio.NewScanner(file)
+	var numAnts int
 	for scanner.Scan() {
 		line := scanner.Text()
-
-		// Skip comments or empty lines
-		if strings.HasPrefix(line, "#") || line == "" {
+		if line == "" {
 			continue
 		}
 
-		fields := strings.Fields(line)
+		if strings.HasPrefix(line, "#") {
+			// Ignore comments
+			continue
+		}
 
-		switch fields[0] {
-		case "##start", "##end":
-			// Skip start and end room directives for now
-		case "L":
-			// Skip ant movement lines for now
-		default:
-			if len(fields) == 3 {
-				roomName := fields[0]
-				graph.AddNode(roomName)
-			} else if len(fields) == 1 {
-				// End of room definitions, start reading links
-				break
-			} else {
-				return nil, fmt.Errorf("Invalid input format")
+		if numAnts == 0 {
+			// Parse the number of ants
+			numAnts, err = strconv.Atoi(line)
+			if err != nil {
+				return nil, err
 			}
-		}
-	}
-
-	// Parse the links between rooms
-	for scanner.Scan() {
-		line := scanner.Text()
-
-		// Skip comments or empty lines
-		if strings.HasPrefix(line, "#") || line == "" {
+		} else if line == "##start" || line == "##end" {
+			// Ignore start and end directives for now
 			continue
+		} else if strings.Contains(line, "-") {
+			// Parse room connections
+			parts := strings.Split(line, "-")
+			from := parts[0]
+			to := parts[1]
+			graph.AddArc(from, to)
+			graph.AddArc(to, from)
+		} else {
+			// Parse room definition
+			parts := strings.Split(line, " ")
+			name := parts[0]
+			graph.AddRoom(name)
 		}
-
-		fields := strings.Split(line, "-")
-		if len(fields) != 2 {
-			return nil, fmt.Errorf("Invalid input format")
-		}
-
-		src := fields[0]
-		dst := fields[1]
-
-		graph.AddEdge(src, dst)
 	}
 
 	if err := scanner.Err(); err != nil {
@@ -112,11 +89,20 @@ func ParseInputFile(filename string) (*Graph, error) {
 }
 
 func main() {
+	// Replace "input.txt" with the actual input file path
 	graph, err := ParseInputFile("input.txt")
 	if err != nil {
-		log.Fatal(err)
+		fmt.Println("Error parsing input file:", err)
+		return
 	}
 
-	// Use the graph representation for further processing
-	fmt.Println(graph)
+
+	for nodeName, node := range graph.Nodes {
+		fmt.Printf("Node: %s, Neighbors: ", nodeName)
+		for _, neighbor := range node.Neighbors {
+			fmt.Printf("%s ", neighbor.Name)
+		}
+		fmt.Println()
+	}
+
 }
